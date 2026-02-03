@@ -16,7 +16,7 @@ public class MainActivity extends AppCompatActivity {
 
     private static final int KEYS_HEIGHT = 4; // rows
     private static final int KEYS_WIDTH  = 5; // columns
-    
+
     private ConstraintLayout rootLayout;
 
     @Override
