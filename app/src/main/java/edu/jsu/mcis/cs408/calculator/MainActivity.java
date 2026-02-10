@@ -18,6 +18,9 @@ public class MainActivity extends AppCompatActivity {
     private static final int KEYS_WIDTH  = 5; // columns
 
     private ConstraintLayout rootLayout;
+    private TextView display;
+
+    private CalculatorModel model;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -26,7 +29,23 @@ public class MainActivity extends AppCompatActivity {
 
         rootLayout = findViewById(R.id.rootLayout);
 
+        // Initialize Model (MVC)
+        model = new CalculatorModel();
+
         initLayout();
+    }
+
+    // Shared click handler for ALL buttons
+    class CalculatorClickHandler implements View.OnClickListener {
+        @Override
+        public void onClick(View view) {
+            String tag = view.getTag().toString();
+
+            model.handle(tag);
+
+            // Update the View (display)
+            display.setText(model.getDisplay());
+        }
     }
 
     private void initLayout() {
@@ -49,7 +68,8 @@ public class MainActivity extends AppCompatActivity {
                 R.string.btnSign, R.string.btn0, R.string.btnDot, R.string.btnPlus, R.string.btnEquals
         };
 
-        // Tags (used later for event handling)
+        // Tags (used for event handling)
+        // (You can keep these as-is and map them inside CalculatorModel)
         String[] keyTags = new String[] {
                 "btn7","btn8","btn9","btnSqrt","btnClear",
                 "btn4","btn5","btn6","btnDivide","btnPercent",
@@ -57,11 +77,11 @@ public class MainActivity extends AppCompatActivity {
                 "btnSign","btn0","btnDot","btnPlus","btnEquals"
         };
 
-
-        TextView display = new TextView(this);
+        // Create display (VIEW)
+        display = new TextView(this);
         int displayId = View.generateViewId();
         display.setId(displayId);
-        display.setText(getString(R.string.txtDisplay));
+        display.setText(model.getDisplay()); // start with model's display
         display.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
         display.setPadding(dp(8), dp(8), dp(8), dp(8));
         display.setTextSize(TypedValue.COMPLEX_UNIT_SP, 48);
@@ -72,6 +92,9 @@ public class MainActivity extends AppCompatActivity {
         ));
 
         rootLayout.addView(display);
+
+        // Create shared click handler once
+        CalculatorClickHandler click = new CalculatorClickHandler();
 
         int[][] horizontals = new int[KEYS_HEIGHT][KEYS_WIDTH];
         int[][] verticals   = new int[KEYS_WIDTH][KEYS_HEIGHT];
@@ -86,9 +109,12 @@ public class MainActivity extends AppCompatActivity {
 
                 b.setText(getString(keyTextRes[index]));
                 b.setTag(keyTags[index]);
+
                 b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 24);
                 b.setCornerRadius(0);
 
+                // Attach shared handler
+                b.setOnClickListener(click);
 
                 ConstraintLayout.LayoutParams lp = new ConstraintLayout.LayoutParams(0, 0);
                 b.setLayoutParams(lp);
@@ -102,7 +128,6 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-
         ConstraintSet cs = new ConstraintSet();
         cs.clone(rootLayout);
 
@@ -112,7 +137,6 @@ public class MainActivity extends AppCompatActivity {
         cs.connect(displayId, ConstraintSet.END, guideEast, ConstraintSet.END);
         cs.constrainWidth(displayId, 0);
         cs.constrainHeight(displayId, ConstraintSet.WRAP_CONTENT);
-
 
         for (int r = 0; r < KEYS_HEIGHT; r++) {
             for (int c = 0; c < KEYS_WIDTH; c++) {
@@ -126,7 +150,6 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-
         for (int r = 0; r < KEYS_HEIGHT; r++) {
             cs.createHorizontalChain(
                     guideWest, ConstraintSet.RIGHT,
@@ -136,7 +159,6 @@ public class MainActivity extends AppCompatActivity {
                     ConstraintSet.CHAIN_SPREAD
             );
         }
-
 
         for (int c = 0; c < KEYS_WIDTH; c++) {
             cs.createVerticalChain(
