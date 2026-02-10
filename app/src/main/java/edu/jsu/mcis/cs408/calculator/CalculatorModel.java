@@ -2,24 +2,19 @@ package edu.jsu.mcis.cs408.calculator;
 
 public class CalculatorModel {
 
-    /* =========================
-       Calculator State
-       ========================= */
+
 
     private String display = "0";
 
-    private double storedValue = 0.0;      // A
-    private String pendingOp = null;       // "+", "-", "*", "/" (or null)
-    private boolean startNewNumber = true; // next digit begins a new entry
+    private double storedValue = 0.0;
+    private String pendingOp = null;
+    private boolean startNewNumber = true;
     private boolean error = false;
 
     public String getDisplay() {
         return error ? "Error" : display;
     }
 
-    /* =========================
-       Public Entry Point
-       ========================= */
 
     public void handle(String tag) {
 
@@ -83,10 +78,6 @@ public class CalculatorModel {
         }
     }
 
-    /* =========================
-       Digits / Decimal
-       ========================= */
-
     private void inputDigit(char d) {
 
         if (startNewNumber) {
@@ -116,9 +107,7 @@ public class CalculatorModel {
         }
     }
 
-    /* =========================
-       Binary Operators + - * /
-       ========================= */
+
 
     private void setBinaryOp(String op) {
 
@@ -138,7 +127,7 @@ public class CalculatorModel {
             return;
         }
 
-        // Chain: compute A (pendingOp) B
+
         double result = applyBinary(storedValue, current, pendingOp);
         if (error) return;
 
@@ -153,7 +142,7 @@ public class CalculatorModel {
 
         if (pendingOp == null) return;
 
-        // If "=" pressed right after operator (no B typed), do nothing
+
         if (startNewNumber) return;
 
         double b = parseDisplay();
@@ -187,10 +176,6 @@ public class CalculatorModel {
         }
     }
 
-    /* =========================
-       Unary Operators √  ±  %
-       ========================= */
-
     private void sqrt() {
 
         double x = parseDisplay();
@@ -214,13 +199,7 @@ public class CalculatorModel {
         else display = "-" + display;
     }
 
-    /*
-      Percent behavior (common desktop style):
-      - If no pending op: x% = x/100
-      - If pending op exists:
-          + or - : treat B% as A*(B/100)
-          * or / : treat B% as (B/100)
-    */
+
     private void percent() {
 
         double x = parseDisplay();
@@ -251,10 +230,6 @@ public class CalculatorModel {
         startNewNumber = true;
     }
 
-    /* =========================
-       Helpers
-       ========================= */
-
     private boolean isDigitTag(String tag) {
         // Exactly "btn0".."btn9"
         return tag != null
@@ -283,10 +258,10 @@ public class CalculatorModel {
         long iv = (long) v;
         if (v == iv) return String.valueOf(iv);
 
-        // Default string, optionally trim if you want
+
         String s = String.valueOf(v);
 
-        // Optional: limit length so it doesn't overflow the display
+
         if (s.length() > 14) s = s.substring(0, 14);
 
         return s;
