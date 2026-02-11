@@ -1,285 +1,258 @@
 package edu.jsu.mcis.cs408.calculator;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+
 public class CalculatorModel {
 
+    // ----- State Machine -----
+    public enum CalculatorState {
+        CLEAR, LHS, OP_SCHEDULED, RHS, RESULT, ERROR
+    }
 
+    public enum Operator {
+        NONE, ADD, SUB, MUL, DIV
+    }
 
+    // ----- Display limits -----
+    private static final int DISPLAY_MAX = 14;
+    private static final int DIV_SCALE = 10;
+
+    // ----- Core Data -----
+    private CalculatorState state = CalculatorState.CLEAR;
+
+    private BigDecimal lhs = BigDecimal.ZERO;
+    private BigDecimal rhs = BigDecimal.ZERO;
+    private Operator op = Operator.NONE;
+
+    private StringBuilder entry = new StringBuilder("0");
     private String display = "0";
 
-    private double storedValue = 0.0;
-    private String pendingOp = null;
-    private boolean startNewNumber = true;
-    private boolean error = false;
+    // ----- Public API -----
 
-    public String getDisplay() {
-        return error ? "Error" : display;
-    }
+    public void input(String tag) {
 
-
-    public void handle(String tag) {
-
-        // After an error, only Clear works
-        if (error) {
-            if ("btnClear".equals(tag)) clearAll();
+        if (state == CalculatorState.ERROR && !tag.equals("C")) {
             return;
         }
 
-        // Digits: btn0..btn9
-        if (isDigitTag(tag)) {
-            inputDigit(tag.charAt(3)); // '0'..'9'
-            return;
+        if (isDigit(tag) || tag.equals(".")) {
+            handleDigit(tag);
         }
-
-        switch (tag) {
-
-            case "btnDot":
-                inputDot();
-                break;
-
-            case "btnClear":
-                clearAll();
-                break;
-
-            case "btnPlus":
-                setBinaryOp("+");
-                break;
-
-            case "btnMinus":
-                setBinaryOp("-");
-                break;
-
-            case "btnMultiply":
-                setBinaryOp("*");
-                break;
-
-            case "btnDivide":
-                setBinaryOp("/");
-                break;
-
-            case "btnEquals":
-                equals();
-                break;
-
-            case "btnSqrt":
-                sqrt();
-                break;
-
-            case "btnSign":
-                negate();
-                break;
-
-            case "btnPercent":
-                percent();
-                break;
-
-            default:
-                // Unknown tag: ignore safely
-                break;
+        else if (isBinaryOp(tag)) {
+            handleOperator(tag);
+        }
+        else if (tag.equals("=")) {
+            handleEquals();
+        }
+        else if (tag.equals("C")) {
+            clearAll();
+        }
+        else if (tag.equals("±")) {
+            negate();
+        }
+        else if (tag.equals("√")) {
+            squareRoot();
+        }
+        else if (tag.equals("%")) {
+            percent();
         }
     }
 
-    private void inputDigit(char d) {
+    public String getDisplayText() {
+        return display;
+    }
 
-        if (startNewNumber) {
-            display = String.valueOf(d);
-            startNewNumber = false;
-            return;
+    // ----- Digit Handling -----
+
+    private void handleDigit(String tag) {
+
+        if (state == CalculatorState.RESULT) {
+            clearAll();
         }
 
-        // Prevent leading zeros like "0002"
-        if ("0".equals(display)) {
-            display = String.valueOf(d);
+        if (state == CalculatorState.OP_SCHEDULED) {
+            entry.setLength(0);
+            state = CalculatorState.RHS;
+        }
+
+        if (entry.length() >= DISPLAY_MAX) return;
+
+        if (tag.equals(".")) {
+            if (entry.indexOf(".") != -1) return;
+            if (entry.length() == 0) entry.append("0");
+        }
+
+        if (entry.toString().equals("0") && !tag.equals(".")) {
+            entry.setLength(0);
+        }
+
+        entry.append(tag);
+        display = entry.toString();
+
+        BigDecimal value = new BigDecimal(display);
+
+        if (state == CalculatorState.RHS) {
+            rhs = value;
         } else {
-            display += d;
+            lhs = value;
+            state = CalculatorState.LHS;
         }
     }
 
-    private void inputDot() {
+    // ----- Operator Handling -----
 
-        if (startNewNumber) {
-            display = "0.";
-            startNewNumber = false;
-            return;
+    private void handleOperator(String tag) {
+
+        Operator newOp = toOperator(tag);
+
+        if (state == CalculatorState.RHS) {
+            compute();
         }
 
-        if (!display.contains(".")) {
-            display += ".";
+        op = newOp;
+        state = CalculatorState.OP_SCHEDULED;
+    }
+
+    private void handleEquals() {
+
+        if (state == CalculatorState.RHS) {
+            compute();
+            state = CalculatorState.RESULT;
         }
     }
 
+    private void compute() {
 
+        try {
+            switch (op) {
+                case ADD:
+                    lhs = lhs.add(rhs);
+                    break;
+                case SUB:
+                    lhs = lhs.subtract(rhs);
+                    break;
+                case MUL:
+                    lhs = lhs.multiply(rhs);
+                    break;
+                case DIV:
+                    if (rhs.compareTo(BigDecimal.ZERO) == 0) {
+                        setError();
+                        return;
+                    }
+                    lhs = lhs.divide(rhs, DIV_SCALE, RoundingMode.HALF_UP);
+                    break;
+                default:
+                    return;
+            }
 
-    private void setBinaryOp(String op) {
+            display = format(lhs);
+            entry = new StringBuilder(display);
+            rhs = BigDecimal.ZERO;
+            op = Operator.NONE;
 
-        double current = parseDisplay();
-
-        // First operator pressed: store A
-        if (pendingOp == null) {
-            storedValue = current;
-            pendingOp = op;
-            startNewNumber = true;
-            return;
-        }
-
-        // If user presses operator again without typing B, just change operator
-        if (startNewNumber) {
-            pendingOp = op;
-            return;
-        }
-
-
-        double result = applyBinary(storedValue, current, pendingOp);
-        if (error) return;
-
-        storedValue = result;
-        display = format(result);
-
-        pendingOp = op;
-        startNewNumber = true;
-    }
-
-    private void equals() {
-
-        if (pendingOp == null) return;
-
-
-        if (startNewNumber) return;
-
-        double b = parseDisplay();
-
-        double result = applyBinary(storedValue, b, pendingOp);
-        if (error) return;
-
-        display = format(result);
-
-        // Reset for next calculation
-        storedValue = result;
-        pendingOp = null;
-        startNewNumber = true;
-    }
-
-    private double applyBinary(double a, double b, String op) {
-
-        switch (op) {
-            case "+": return a + b;
-            case "-": return a - b;
-            case "*": return a * b;
-            case "/":
-                if (b == 0.0) {
-                    setError();
-                    return 0.0;
-                }
-                return a / b;
-            default:
-                setError();
-                return 0.0;
+        } catch (Exception e) {
+            setError();
         }
     }
 
-    private void sqrt() {
+    // ----- Unary Operators -----
 
-        double x = parseDisplay();
+    private void negate() {
+        BigDecimal value = new BigDecimal(display).negate();
+        display = format(value);
+        entry = new StringBuilder(display);
 
-        if (x < 0) {
+        if (state == CalculatorState.RHS) {
+            rhs = value;
+        } else {
+            lhs = value;
+        }
+    }
+
+    private void squareRoot() {
+
+        BigDecimal value = new BigDecimal(display);
+
+        if (value.compareTo(BigDecimal.ZERO) < 0) {
             setError();
             return;
         }
 
-        double r = Math.sqrt(x);
-        display = format(r);
-        startNewNumber = true;
+        double sqrt = Math.sqrt(value.doubleValue());
+        value = new BigDecimal(sqrt);
+
+        display = format(value);
+        entry = new StringBuilder(display);
+
+        if (state == CalculatorState.RHS) {
+            rhs = value;
+        } else {
+            lhs = value;
+        }
     }
-
-    private void negate() {
-
-        // Toggle sign on display text (keeps decimals as typed)
-        if ("0".equals(display) || "0.".equals(display)) return;
-
-        if (display.startsWith("-")) display = display.substring(1);
-        else display = "-" + display;
-    }
-
 
     private void percent() {
 
-        double x = parseDisplay();
+        if (op == Operator.NONE) return;
 
-        if (pendingOp == null) {
-            display = format(x / 100.0);
-            startNewNumber = true;
-            return;
-        }
+        rhs = lhs.multiply(rhs)
+                .divide(new BigDecimal("100"), DIV_SCALE, RoundingMode.HALF_UP);
 
-        // If user hasn't typed B yet, treat B as 0
-        if (startNewNumber) x = 0.0;
-
-        double b;
-        switch (pendingOp) {
-            case "+":
-            case "-":
-                b = storedValue * (x / 100.0);
-                break;
-            case "*":
-            case "/":
-            default:
-                b = x / 100.0;
-                break;
-        }
-
-        display = format(b);
-        startNewNumber = true;
+        display = format(rhs);
+        entry = new StringBuilder(display);
     }
 
-    private boolean isDigitTag(String tag) {
-        // Exactly "btn0".."btn9"
-        return tag != null
-                && tag.length() == 4
-                && tag.startsWith("btn")
-                && Character.isDigit(tag.charAt(3));
-    }
-
-    private double parseDisplay() {
-        try {
-            return Double.parseDouble(display);
-        } catch (Exception e) {
-            setError();
-            return 0.0;
-        }
-    }
-
-    private String format(double v) {
-
-        if (Double.isNaN(v) || Double.isInfinite(v)) {
-            setError();
-            return "Error";
-        }
-
-        // If it's basically an integer, show without .0
-        long iv = (long) v;
-        if (v == iv) return String.valueOf(iv);
-
-
-        String s = String.valueOf(v);
-
-
-        if (s.length() > 14) s = s.substring(0, 14);
-
-        return s;
-    }
+    // ----- Helpers -----
 
     private void clearAll() {
+        state = CalculatorState.CLEAR;
+        lhs = BigDecimal.ZERO;
+        rhs = BigDecimal.ZERO;
+        op = Operator.NONE;
+        entry = new StringBuilder("0");
         display = "0";
-        storedValue = 0.0;
-        pendingOp = null;
-        startNewNumber = true;
-        error = false;
     }
 
     private void setError() {
-        error = true;
+        state = CalculatorState.ERROR;
         display = "Error";
-        storedValue = 0.0;
-        pendingOp = null;
-        startNewNumber = true;
+        lhs = BigDecimal.ZERO;
+        rhs = BigDecimal.ZERO;
+        op = Operator.NONE;
+    }
+
+    private boolean isDigit(String s) {
+        return s.matches("[0-9]");
+    }
+
+    private boolean isBinaryOp(String s) {
+        return s.equals("+") || s.equals("-")
+                || s.equals("×") || s.equals("*")
+                || s.equals("÷") || s.equals("/");
+    }
+
+    private Operator toOperator(String s) {
+        switch (s) {
+            case "+": return Operator.ADD;
+            case "-": return Operator.SUB;
+            case "×":
+            case "*": return Operator.MUL;
+            case "÷":
+            case "/": return Operator.DIV;
+            default: return Operator.NONE;
+        }
+    }
+
+    private String format(BigDecimal value) {
+
+        value = value.stripTrailingZeros();
+        String s = value.toPlainString();
+
+        if (s.length() > DISPLAY_MAX) {
+            s = s.substring(0, DISPLAY_MAX);
+        }
+
+        return s;
     }
 }
