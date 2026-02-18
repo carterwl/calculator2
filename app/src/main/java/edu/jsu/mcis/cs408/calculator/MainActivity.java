@@ -23,17 +23,17 @@ public class MainActivity extends AppCompatActivity {
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
-        // Create Model
+
         model = new CalculatorModel();
 
         // Create Controller
         controller = new CalculatorController(model);
 
-        // Attach shared click handler to every button in the layout (recursive)
+
         CalculatorClickHandler click = new CalculatorClickHandler();
         attachClickHandlers(binding.getRoot(), click);
 
-        // Initialize display
+
         binding.display.setText("0");
     }
 

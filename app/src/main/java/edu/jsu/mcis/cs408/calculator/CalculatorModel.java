@@ -5,7 +5,6 @@ import java.math.RoundingMode;
 
 public class CalculatorModel {
 
-    // ----- State Machine -----
     public enum CalculatorState {
         CLEAR, LHS, OP_SCHEDULED, RHS, RESULT, ERROR
     }
@@ -14,21 +13,21 @@ public class CalculatorModel {
         NONE, ADD, SUB, MUL, DIV
     }
 
-    // ----- Display limits -----
     private static final int DISPLAY_MAX = 14;
     private static final int DIV_SCALE = 10;
 
-    // ----- Core Data -----
     private CalculatorState state = CalculatorState.CLEAR;
 
     private BigDecimal lhs = BigDecimal.ZERO;
     private BigDecimal rhs = BigDecimal.ZERO;
     private Operator op = Operator.NONE;
 
+
+    private Operator lastOp = Operator.NONE;
+    private BigDecimal lastRhs = BigDecimal.ZERO;
+
     private StringBuilder entry = new StringBuilder("0");
     private String display = "0";
-
-    // ----- Public API -----
 
     public void input(String tag) {
 
@@ -63,12 +62,17 @@ public class CalculatorModel {
         return display;
     }
 
-    // ----- Digit Handling -----
-
     private void handleDigit(String tag) {
 
+
         if (state == CalculatorState.RESULT) {
-            clearAll();
+            state = CalculatorState.CLEAR;
+            lhs = BigDecimal.ZERO;
+            rhs = BigDecimal.ZERO;
+            op = Operator.NONE;
+            entry = new StringBuilder("0");
+            display = "0";
+            // Note: We intentionally do NOT clear lastOp/lastRhs here.
         }
 
         if (state == CalculatorState.OP_SCHEDULED) {
@@ -100,8 +104,6 @@ public class CalculatorModel {
         }
     }
 
-    // ----- Operator Handling -----
-
     private void handleOperator(String tag) {
 
         Operator newOp = toOperator(tag);
@@ -110,13 +112,35 @@ public class CalculatorModel {
             compute();
         }
 
+
+        lastOp = Operator.NONE;
+        lastRhs = BigDecimal.ZERO;
+
         op = newOp;
         state = CalculatorState.OP_SCHEDULED;
     }
 
     private void handleEquals() {
 
+
+        if (state == CalculatorState.OP_SCHEDULED) {
+            rhs = lhs;
+            state = CalculatorState.RHS;
+        }
+
+        // Normal equals after entering RHS
         if (state == CalculatorState.RHS) {
+            compute();
+            state = CalculatorState.RESULT;
+            return;
+        }
+
+
+        if (state == CalculatorState.RESULT && lastOp != Operator.NONE) {
+            // Apply last operation to the current displayed result
+            op = lastOp;
+            rhs = lastRhs;
+            state = CalculatorState.RHS;
             compute();
             state = CalculatorState.RESULT;
         }
@@ -146,8 +170,15 @@ public class CalculatorModel {
                     return;
             }
 
+
+            if (op != Operator.NONE) {
+                lastOp = op;
+                lastRhs = rhs;
+            }
+
             display = format(lhs);
             entry = new StringBuilder(display);
+
             rhs = BigDecimal.ZERO;
             op = Operator.NONE;
 
@@ -155,8 +186,6 @@ public class CalculatorModel {
             setError();
         }
     }
-
-    // ----- Unary Operators -----
 
     private void negate() {
         BigDecimal value = new BigDecimal(display).negate();
@@ -180,7 +209,9 @@ public class CalculatorModel {
         }
 
         double sqrt = Math.sqrt(value.doubleValue());
-        value = new BigDecimal(sqrt);
+
+
+        value = BigDecimal.valueOf(sqrt);
 
         display = format(value);
         entry = new StringBuilder(display);
@@ -194,7 +225,18 @@ public class CalculatorModel {
 
     private void percent() {
 
+
+
         if (op == Operator.NONE) return;
+
+        if (state == CalculatorState.OP_SCHEDULED) {
+            rhs = lhs;
+            state = CalculatorState.RHS;
+        } else if (state != CalculatorState.RHS) {
+            // If not in RHS, base percent on what's on display
+            rhs = new BigDecimal(display);
+            state = CalculatorState.RHS;
+        }
 
         rhs = lhs.multiply(rhs)
                 .divide(new BigDecimal("100"), DIV_SCALE, RoundingMode.HALF_UP);
@@ -203,13 +245,16 @@ public class CalculatorModel {
         entry = new StringBuilder(display);
     }
 
-    // ----- Helpers -----
-
     private void clearAll() {
         state = CalculatorState.CLEAR;
         lhs = BigDecimal.ZERO;
         rhs = BigDecimal.ZERO;
         op = Operator.NONE;
+
+
+        lastOp = Operator.NONE;
+        lastRhs = BigDecimal.ZERO;
+
         entry = new StringBuilder("0");
         display = "0";
     }
@@ -220,6 +265,9 @@ public class CalculatorModel {
         lhs = BigDecimal.ZERO;
         rhs = BigDecimal.ZERO;
         op = Operator.NONE;
+
+        lastOp = Operator.NONE;
+        lastRhs = BigDecimal.ZERO;
     }
 
     private boolean isDigit(String s) {
