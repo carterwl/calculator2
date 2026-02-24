@@ -72,7 +72,7 @@ public class CalculatorModel {
             op = Operator.NONE;
             entry = new StringBuilder("0");
             display = "0";
-            // Note: We intentionally do NOT clear lastOp/lastRhs here.
+
         }
 
         if (state == CalculatorState.OP_SCHEDULED) {
@@ -137,7 +137,7 @@ public class CalculatorModel {
 
 
         if (state == CalculatorState.RESULT && lastOp != Operator.NONE) {
-            // Apply last operation to the current displayed result
+
             op = lastOp;
             rhs = lastRhs;
             state = CalculatorState.RHS;
@@ -233,7 +233,7 @@ public class CalculatorModel {
             rhs = lhs;
             state = CalculatorState.RHS;
         } else if (state != CalculatorState.RHS) {
-            // If not in RHS, base percent on what's on display
+
             rhs = new BigDecimal(display);
             state = CalculatorState.RHS;
         }

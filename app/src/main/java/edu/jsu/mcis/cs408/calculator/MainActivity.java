@@ -26,7 +26,6 @@ public class MainActivity extends AppCompatActivity {
 
         model = new CalculatorModel();
 
-        // Create Controller
         controller = new CalculatorController(model);
 
 
