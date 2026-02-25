@@ -37,7 +37,7 @@ public class MainActivity extends AppCompatActivity {
         final int guideWest  = R.id.guideWest;
         final int guideEast  = R.id.guideEast;
 
-        // Button text string resources (must exist in strings.xml)
+        
         int[] keyTextRes = new int[] {
                 // Row 1
                 R.string.btn7, R.string.btn8, R.string.btn9, R.string.btnSqrt, R.string.btnClear,
@@ -49,7 +49,6 @@ public class MainActivity extends AppCompatActivity {
                 R.string.btnSign, R.string.btn0, R.string.btnDot, R.string.btnPlus, R.string.btnEquals
         };
 
-        // Tags (used later for event handling)
         String[] keyTags = new String[] {
                 "btn7","btn8","btn9","btnSqrt","btnClear",
                 "btn4","btn5","btn6","btnDivide","btnPercent",
